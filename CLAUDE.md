@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **תרגילי לסת** — a Hebrew (RTL) jaw-exercise web app meant to be added to an iPhone Home Screen (Safari → Share → Add to Home Screen). Static site, no build step, no framework, no dependencies (Google Fonts only).
 
-Deployed via GitHub Pages from the `main` branch root. To publish changes: `git push origin main`.
+Deployed via GitHub Pages from the `main` branch root (https://assafhs-ship-it.github.io/jaw-exercise/). To publish changes: `git push origin main`.
+
+**Always bump the `?v=` number on `styles.css` and `script.js` in `index.html` when changing either file.** GitHub Pages serves with `max-age=600`, and iPhone Safari will otherwise pair a fresh `index.html` with a stale cached `script.js` (this broke the "Let's Start" button once).
 
 ## Files
 
