@@ -10,14 +10,19 @@
 <g stroke-linecap="round" stroke-linejoin="round">
 
 <path d="M56 300 C80 276 128 268 172 266 M344 300 C320 276 272 268 228 266" stroke="#24332f" stroke-width="4" fill="none"/>
-<path d="M178 236 L172 300 M222 236 L228 300" stroke="#24332f" stroke-width="4" fill="none"/>
+<path d="M178 258 L172 300 M222 258 L228 300" stroke="#24332f" stroke-width="4" fill="none"/>
 <path d="M126 124 C106 116 102 162 126 168" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
 <path d="M274 124 C294 116 298 162 274 168" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
-<path d="M122 140 C122 72 160 44 200 44 C240 44 278 72 278 140 C278 200 248 250 200 250 C152 250 122 200 122 140 Z" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
+<path d="M122 140 C122 72 160 44 200 44 C240 44 278 72 278 140 C278 222 248 272 200 272 C152 272 122 222 122 140 Z" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
 <path d="M120 138 C110 66 158 36 200 38 C244 36 292 64 280 138 C272 104 252 86 226 84 C204 82 176 92 156 92 C138 94 126 112 120 138 Z" fill="#24332f"/>
 <path d="M160 130 Q171 137 182 130 M218 130 Q229 137 240 130" stroke="#24332f" stroke-width="3.5" fill="none"/>
 <path d="M200 142 Q193 162 199 168 Q205 171 209 166" stroke="#24332f" stroke-width="3" fill="none"/>
-<ellipse cx="200" cy="206" rx="18" ry="8" fill="#5b3b40" stroke="#24332f" stroke-width="3.5"/>
-<line x1="40" y1="312" x2="126" y2="212" stroke="#24332f" stroke-width="27"/><line x1="40" y1="312" x2="126" y2="212" stroke="#f1e1cf" stroke-width="20"/><line x1="360" y1="312" x2="274" y2="212" stroke="#24332f" stroke-width="27"/><line x1="360" y1="312" x2="274" y2="212" stroke="#f1e1cf" stroke-width="20"/><line x1="104" y1="70" x2="62.0" y2="70.0" stroke="#2f6b5c" stroke-width="6"/><polygon points="44,70 62.0,58.0 62.0,82.0" fill="#2f6b5c" stroke="#2f6b5c" stroke-width="3"/><line x1="296" y1="70" x2="338.0" y2="70.0" stroke="#2f6b5c" stroke-width="6"/><polygon points="356,70 338.0,82.0 338.0,58.0" fill="#2f6b5c" stroke="#2f6b5c" stroke-width="3"/>
+<ellipse cx="200" cy="214" rx="22" ry="30" fill="#5b3b40" stroke="#24332f" stroke-width="3.5"/><path d="M185 196 Q200 188 215 196" stroke="#fdf9f3" stroke-width="4" fill="none"/>
+
+<line x1="328" y1="50" x2="328" y2="42" stroke="#b58d52" stroke-width="5"/>
+<line x1="320" y1="40" x2="336" y2="40" stroke="#b58d52" stroke-width="5"/>
+<circle cx="328" cy="84" r="31" fill="#fdf9f3" stroke="#b58d52" stroke-width="4"/>
+<text x="328" y="92" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="24" fill="#b58d52">10</text>
+<line x1="76" y1="168" x2="76.0" y2="230.0" stroke="#2f6b5c" stroke-width="6"/><polygon points="76,248 64.0,230.0 88.0,230.0" fill="#2f6b5c" stroke="#2f6b5c" stroke-width="3"/>
 </g>
 </svg>

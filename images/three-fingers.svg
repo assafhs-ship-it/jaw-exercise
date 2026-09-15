@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#eef2ec"/>
+    <stop offset="1" stop-color="#f6efe4"/>
+  </linearGradient>
+</defs>
+<rect width="400" height="300" fill="url(#bg)"/>
+<circle cx="200" cy="158" r="132" fill="#ffffff" opacity="0.55"/>
+<g stroke-linecap="round" stroke-linejoin="round">
+
+<path d="M56 300 C80 276 128 268 172 266 M344 300 C320 276 272 268 228 266" stroke="#24332f" stroke-width="4" fill="none"/>
+<path d="M178 270 L172 300 M222 270 L228 300" stroke="#24332f" stroke-width="4" fill="none"/>
+<path d="M126 124 C106 116 102 162 126 168" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
+<path d="M274 124 C294 116 298 162 274 168" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
+<path d="M122 140 C122 72 160 44 200 44 C240 44 278 72 278 140 C278 234 248 284 200 284 C152 284 122 234 122 140 Z" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
+<path d="M120 138 C110 66 158 36 200 38 C244 36 292 64 280 138 C272 104 252 86 226 84 C204 82 176 92 156 92 C138 94 126 112 120 138 Z" fill="#24332f"/>
+<path d="M160 130 Q171 137 182 130 M218 130 Q229 137 240 130" stroke="#24332f" stroke-width="3.5" fill="none"/>
+<path d="M200 142 Q193 162 199 168 Q205 171 209 166" stroke="#24332f" stroke-width="3" fill="none"/>
+<ellipse cx="200" cy="222" rx="34" ry="42" fill="#5b3b40" stroke="#24332f" stroke-width="3.5"/><path d="M173 192 Q200 184 227 192" stroke="#fdf9f3" stroke-width="4" fill="none"/>
+<rect x="298" y="182" width="96" height="84" rx="32" fill="#f1e1cf" stroke="#24332f" stroke-width="3.5"/><line x1="320" y1="203" x2="188" y2="203" stroke="#24332f" stroke-width="25"/><line x1="320" y1="203" x2="188" y2="203" stroke="#f1e1cf" stroke-width="18"/><line x1="320" y1="223" x2="188" y2="223" stroke="#24332f" stroke-width="25"/><line x1="320" y1="223" x2="188" y2="223" stroke="#f1e1cf" stroke-width="18"/><line x1="320" y1="243" x2="188" y2="243" stroke="#24332f" stroke-width="25"/><line x1="320" y1="243" x2="188" y2="243" stroke="#f1e1cf" stroke-width="18"/><circle cx="80" cy="80" r="30" fill="#b58d52"/><text x="80" y="91" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="32" fill="#fdf9f3">3</text>
+</g>
+</svg>
