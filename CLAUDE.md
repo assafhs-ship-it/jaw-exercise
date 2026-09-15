@@ -10,7 +10,7 @@ Deployed via GitHub Pages from the `main` branch root. To publish changes: `git 
 
 ## Files
 
-- `index.html` — two screens: `#list-screen` (date, daily progress, exercise cards) and `#exercise-screen` (hero image, description, Counter with progress ring, hold timer, fixed action bar with איפוס / Done)
+- `index.html` — three screens: `#welcome-screen` (time-of-day greeting, date, today's progress, "Let's Start"), `#list-screen` (date, daily progress, exercise cards) and `#exercise-screen` (hero image, description, Counter with progress ring, hold timer, fixed action bar with איפוס / Done)
 - `script.js` — `EXERCISES` data array at the top, then state, list rendering, exercise rendering, counter/hold timer/done, bell sound, wake lock, routing
 - `styles.css` — design tokens on `:root`, dark-mode overrides in `@media (prefers-color-scheme: dark)`
 - `manifest.json`, `icons/` — Home Screen name and icons (`apple-touch-icon.png` is what iOS uses)
@@ -28,7 +28,8 @@ Deployed via GitHub Pages from the `main` branch root. To publish changes: `git 
 - **State** lives in `localStorage` under `jaw-exercise-v2`: `{ day, items: { [id]: { count, holdStart, done } } }`. It resets automatically on a new calendar day (checked on load and when the app returns to the foreground).
 - **Hold timer** stores a start timestamp, not a tick count. One global `tick()` ends every running hold, so a hold still finishes after leaving the screen or backgrounding; the bell only rings if the hold ended < 3s ago.
 - **Bell** is synthesized with Web Audio (inharmonic sine partials). iOS requires an unlocking tap, done in `unlockAudio()` on each Counter tap. iPhone silent mode mutes it.
-- **Done** toggles; marking done on the detail screen returns to the list after 450ms.
+- **Welcome** shows on every launch (any hash is cleared at startup). Greeting: בוקר טוב 05–12, צהריים טובים 12–17, ערב טוב otherwise. `route()` does nothing until `start()` sets `started`.
+- **Done** is disabled until the count reaches `DONE_AT` (10); a done mark can always be undone. Marking done on the detail screen returns to the list after 450ms.
 - **Routing** is by URL hash (`#open-wide`); `check` exercises are not routable.
 - `ring` is an SVG element — toggle its `hidden` attribute, not the `.hidden` property.
 - Images inside fixed containers use `width: 100%; height: 100%; object-fit: cover` (never `auto` + `max-*`).

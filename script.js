@@ -34,6 +34,7 @@ const EXERCISES = [
     image: 'images/close-resist.svg',
     kind: 'counter',
     hold: 10,
+    goal: 10,
   },
   {
     id: 'jaw-forward',
@@ -50,9 +51,11 @@ const EXERCISES = [
     image: 'images/side-to-side.svg',
     kind: 'counter',
     counterLabel: 'בזוגות',
+    goal: 10,
   },
 ];
 
+const DONE_AT = 10; // Done unlocks once the counter reaches this
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
 const BELL_GRACE_MS = 3000; // ring only if the hold ended at most this long ago
 
@@ -61,6 +64,7 @@ const BELL_GRACE_MS = 3000; // ring only if the hold ended at most this long ago
 // Everything starts fresh each day.
 const STORAGE_KEY = 'jaw-exercise-v2';
 let state = loadState();   // { day, items: { [id]: { count, holdStart, done } } }
+let started = false;       // false while the welcome screen is showing
 let current = null;        // the exercise currently open
 let finishedId = null;     // exercise whose hold just completed (shows "time's up")
 let tickHandle = null;
@@ -105,6 +109,7 @@ function item(id) {
 
 // ===== ELEMENTS =====
 const $ = (id) => document.getElementById(id);
+const welcomeScreen = $('welcome-screen');
 const listScreen = $('list-screen');
 const exerciseScreen = $('exercise-screen');
 const listEl = $('exercise-list');
@@ -114,6 +119,35 @@ const ringFill = $('ring-fill');
 const doneBtn = $('done-btn');
 
 const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+// ===== WELCOME SCREEN =====
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'בוקר טוב';
+  if (hour >= 12 && hour < 17) return 'צהריים טובים';
+  return 'ערב טוב';
+}
+
+function formattedToday() {
+  return new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function renderWelcome() {
+  $('welcome-greeting').textContent = greeting();
+  $('welcome-date').textContent = formattedToday();
+  const doneCount = EXERCISES.filter((ex) => item(ex.id).done).length;
+  const progress = $('welcome-progress');
+  progress.hidden = doneCount === 0;
+  progress.textContent = doneCount === EXERCISES.length
+    ? 'כל התרגילים של היום הושלמו'
+    : `השלמת היום ${doneCount} מתוך ${EXERCISES.length} תרגילים`;
+}
+
+function start() {
+  started = true;
+  welcomeScreen.hidden = true;
+  route();
+}
 
 // ===== LIST SCREEN =====
 function metaFor(ex) {
@@ -126,9 +160,7 @@ function metaFor(ex) {
 }
 
 function renderList() {
-  $('today-date').textContent = new Date().toLocaleDateString('he-IL', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  });
+  $('today-date').textContent = formattedToday();
 
   listEl.innerHTML = '';
   EXERCISES.forEach((ex, i) => {
@@ -231,6 +263,8 @@ function renderExercise() {
   ringFill.style.strokeDasharray = RING_CIRCUMFERENCE;
   ringFill.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - progress);
 
+  // Done stays locked until the target is reached (but a done mark can always be undone).
+  doneBtn.disabled = !it.done && it.count < DONE_AT;
   doneBtn.classList.toggle('is-done', it.done);
   doneBtn.innerHTML = it.done ? `${CHECK_SVG}<span>Done</span>` : 'Done';
 }
@@ -378,6 +412,7 @@ function releaseWakeLock() {
 // ===== ROUTING =====
 // The URL hash (#open-wide) picks the screen, so a refresh keeps you in place.
 function route() {
+  if (!started) return;
   const ex = EXERCISES.find((e) => e.id === location.hash.slice(1) && e.kind === 'counter');
   if (ex) openExercise(ex);
   else closeExercise();
@@ -389,6 +424,7 @@ function goToList() {
 }
 
 // ===== INIT =====
+$('start-btn').addEventListener('click', start);
 counterBtn.addEventListener('click', increment);
 $('reset-btn').addEventListener('click', reset);
 doneBtn.addEventListener('click', () => current && toggleDone(current.id));
@@ -400,8 +436,12 @@ document.addEventListener('visibilitychange', () => {
   wakeLock = null;
   tick();
   if (tickHandle) requestWakeLock();
-  if (current) renderExercise(); else renderList();
+  if (!started) renderWelcome();
+  else if (current) renderExercise();
+  else renderList();
 });
 
+// Every launch opens on the welcome screen.
+history.replaceState(null, '', location.pathname + location.search);
 if (Object.values(state.items).some((it) => it.holdStart)) startTicking();
-route();
+renderWelcome();

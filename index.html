@@ -23,8 +23,32 @@
 </head>
 <body>
 
+  <!-- Welcome -->
+  <main id="welcome-screen" class="screen screen-welcome">
+    <div class="welcome-inner">
+      <div class="emblem" aria-hidden="true">
+        <span class="emblem-ring emblem-ring-outer"></span>
+        <span class="emblem-ring"></span>
+        <svg class="emblem-face" viewBox="0 0 120 120">
+          <path d="M34 58 C34 30 46 20 60 20 C74 20 86 30 86 58 C86 82 74 100 60 100 C46 100 34 82 34 58 Z"/>
+          <path d="M46 54 Q50.5 58 55 54 M65 54 Q69.5 58 74 54"/>
+          <path d="M60 60 Q57 69 60 71"/>
+          <path d="M52 81 Q60 87 68 81" class="emblem-smile"/>
+        </svg>
+      </div>
+      <p id="welcome-date" class="eyebrow"></p>
+      <h1 id="welcome-greeting" class="welcome-greeting"></h1>
+      <p class="welcome-text">כמה דקות של תרגול, בשביל לסת רגועה וחזקה.</p>
+      <p id="welcome-progress" class="welcome-progress" hidden></p>
+    </div>
+    <button id="start-btn" class="btn btn-primary btn-start" type="button">
+      <span>Let's Start</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+  </main>
+
   <!-- Exercise list -->
-  <main id="list-screen" class="screen">
+  <main id="list-screen" class="screen" hidden>
     <header class="list-header">
       <p id="today-date" class="eyebrow"></p>
       <h1>תרגילי לסת</h1>
