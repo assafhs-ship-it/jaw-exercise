@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>תרגילי לסת</title>
+
+  <!-- Home Screen app (iOS) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="תרגילי לסת">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f4f7f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101614" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.json">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Exercise list -->
+  <main id="list-screen" class="screen">
+    <header class="list-header">
+      <h1>תרגילי לסת</h1>
+      <p class="subtitle">בחרו תרגיל כדי להתחיל</p>
+    </header>
+    <ul id="exercise-list" class="exercise-list"></ul>
+  </main>
+
+  <!-- Exercise detail -->
+  <main id="exercise-screen" class="screen" hidden>
+    <header class="detail-header">
+      <button id="back-btn" class="back-btn" type="button" aria-label="חזרה לרשימה">
+        <span aria-hidden="true">›</span> חזרה
+      </button>
+    </header>
+
+    <div class="detail-image">
+      <img id="ex-image" src="" alt="">
+    </div>
+
+    <h2 id="ex-title" class="detail-title"></h2>
+    <ol id="ex-steps" class="detail-steps"></ol>
+
+    <div class="counter-area">
+      <button id="counter-btn" class="counter-btn" type="button">
+        <span class="counter-label">Counter</span>
+        <span id="counter-value" class="counter-value">0</span>
+      </button>
+
+      <div id="timer" class="timer" hidden>
+        <span class="timer-label">זמן</span>
+        <span id="timer-value" class="timer-value">00:00</span>
+      </div>
+
+      <button id="reset-btn" class="reset-btn" type="button">איפוס</button>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
