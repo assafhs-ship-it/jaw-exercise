@@ -217,6 +217,27 @@ svg path { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: 
   transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
+.btn-clear {
+  margin-top: 14px;
+  padding: 7px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.btn-clear:active { background: var(--surface); }
+
+.btn-clear.is-confirming {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
 .exercise-list {
   list-style: none;
   margin: 0;
@@ -494,6 +515,13 @@ a.card:active { transform: scale(0.985); }
 
 .hold.is-finished .hold-value,
 .hold.is-finished .hold-status { color: var(--gold); }
+
+/* Visible cue for when the phone is on silent */
+.hold.is-finished .hold-value { animation: chime 0.6s ease 2; }
+
+@keyframes chime {
+  30% { transform: scale(1.12); opacity: 0.75; }
+}
 
 /* ===== ACTION BAR ===== */
 .action-bar {

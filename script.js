@@ -57,7 +57,8 @@ const EXERCISES = [
 
 const DONE_AT = 10; // Done unlocks once the counter reaches this
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
-const BELL_GRACE_MS = 3000; // ring only if the hold ended at most this long ago
+const BELL_GRACE_MS = 60000; // don't ring for a hold that ended longer ago than this
+const CLEAR_CONFIRM_MS = 5000; // how long "Clear All" waits for the confirming tap
 
 // ===== STATE =====
 // Saved to localStorage so progress survives iOS closing the app in the background.
@@ -70,6 +71,8 @@ let finishedId = null;     // exercise whose hold just completed (shows "time's 
 let tickHandle = null;
 let wakeLock = null;
 let audioCtx = null;
+let scheduledBell = null;  // { id, fireAt, nodes } — bell queued on the audio clock
+let clearConfirmHandle = null;
 
 function todayKey() {
   const d = new Date();
@@ -198,10 +201,41 @@ function renderList() {
     listEl.appendChild(li);
   });
 
+  cancelClearConfirm();
   const doneCount = EXERCISES.filter((ex) => item(ex.id).done).length;
   $('progress-count').textContent = doneCount;
   $('progress-total').textContent = EXERCISES.length;
   $('progress-fill').style.width = `${(doneCount / EXERCISES.length) * 100}%`;
+}
+
+// ===== CLEAR ALL =====
+// First tap asks for confirmation, second tap clears the day.
+function onClearClick() {
+  const btn = $('clear-btn');
+  if (btn.classList.contains('is-confirming')) {
+    clearAll();
+    return;
+  }
+  btn.classList.add('is-confirming');
+  btn.textContent = 'לנקות הכל? לחצו שוב';
+  clearConfirmHandle = setTimeout(cancelClearConfirm, CLEAR_CONFIRM_MS);
+}
+
+function cancelClearConfirm() {
+  clearTimeout(clearConfirmHandle);
+  clearConfirmHandle = null;
+  const btn = $('clear-btn');
+  btn.classList.remove('is-confirming');
+  btn.textContent = 'Clear All';
+}
+
+function clearAll() {
+  state = { day: todayKey(), items: {} };
+  finishedId = null;
+  cancelBell();
+  stopTicking();
+  saveState();
+  renderList();
 }
 
 // ===== EXERCISE SCREEN =====
@@ -280,6 +314,7 @@ function increment() {
   if (current.hold) {
     it.holdStart = Date.now();
     finishedId = null;
+    scheduleBellIn(current.hold, current.id);
     startTicking();
   }
   saveState();
@@ -296,6 +331,7 @@ function reset() {
   it.count = 0;
   it.holdStart = null;
   finishedId = null;
+  cancelBell();
   saveState();
   tick();
   renderExercise();
@@ -325,7 +361,8 @@ function tick() {
       it.holdStart = null;
       finishedId = ex.id;
       saveState();
-      if (overBy < BELL_GRACE_MS) playBell();
+      if (overBy < BELL_GRACE_MS) bellDue(ex.id);
+      else cancelBell();
     } else {
       anyRunning = true;
     }
@@ -346,39 +383,51 @@ function stopTicking() {
 }
 
 // ===== BELL SOUND =====
-// iOS only allows audio that was unlocked by a tap, so the Counter tap unlocks it.
-function unlockAudio() {
+// The bell is queued on the audio clock the moment a hold starts, so it rings
+// even if JS timers are throttled (background tabs, a busy phone). If the audio
+// clock was suspended and the queued bell hasn't fired by the time the hold
+// ends, bellDue() plays one immediately instead. Both paths are guarded so a
+// hold can never ring twice or stay silent.
+function ensureAudio() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state !== 'running') audioCtx.resume();
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioCtx.createBuffer(1, 1, 22050);
-    source.connect(audioCtx.destination);
-    source.start(0);
   } catch {
     audioCtx = null;
   }
+  return audioCtx;
 }
 
-function playBell() {
-  if (!audioCtx) return;
-  if (audioCtx.state !== 'running') audioCtx.resume();
-  const now = audioCtx.currentTime;
-  const master = audioCtx.createGain();
-  master.gain.value = 0.6;
-  master.connect(audioCtx.destination);
+// iOS only allows audio that was unlocked by a tap, so every tap nudges it.
+function unlockAudio() {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  try {
+    const source = ctx.createBufferSource();
+    source.buffer = ctx.createBuffer(1, 1, 22050);
+    source.connect(ctx.destination);
+    source.start(0);
+  } catch {
+    // An unlock that fails is not fatal – bellDue() still tries later.
+  }
+}
 
-  // A bell is a few inharmonic partials that fade at different rates.
+// A bell is a few inharmonic partials that fade at different rates.
+function ringBell(ctx, at) {
+  const master = ctx.createGain();
+  master.gain.value = 0.7;
+  master.connect(ctx.destination);
+  const nodes = [];
   const base = 784; // G5
   const partials = [
     [1, 0.9, 3.2], [2, 0.45, 2.2], [2.76, 0.32, 1.6], [5.4, 0.14, 0.9], [8.93, 0.07, 0.5],
   ];
   [0, 0.9].forEach((offset, strike) => {
-    const t = now + offset;
+    const t = at + offset;
     const level = strike === 0 ? 1 : 0.55;
     partials.forEach(([ratio, amp, decay]) => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.value = base * ratio;
       gain.gain.setValueAtTime(0.0001, t);
@@ -387,8 +436,40 @@ function playBell() {
       osc.connect(gain).connect(master);
       osc.start(t);
       osc.stop(t + decay + 0.05);
+      nodes.push(osc);
     });
   });
+  return nodes;
+}
+
+// Queue the bell for `seconds` from now (re-queuing replaces any earlier one).
+function scheduleBellIn(seconds, id) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  cancelBell();
+  const fireAt = ctx.currentTime + Math.max(seconds, 0);
+  scheduledBell = { id, fireAt, nodes: ringBell(ctx, fireAt) };
+}
+
+function cancelBell() {
+  if (!scheduledBell) return;
+  scheduledBell.nodes.forEach((osc) => {
+    try { osc.stop(); } catch { /* already finished */ }
+  });
+  scheduledBell = null;
+}
+
+// Called the moment a hold ends: ring now unless the queued bell already did.
+function bellDue(id) {
+  const alreadyRang = scheduledBell && scheduledBell.id === id && audioCtx
+    && audioCtx.currentTime >= scheduledBell.fireAt;
+  if (alreadyRang) {
+    scheduledBell = null;
+    return;
+  }
+  cancelBell();
+  const ctx = ensureAudio();
+  if (ctx) ringBell(ctx, ctx.currentTime + 0.02);
 }
 
 // ===== WAKE LOCK =====
@@ -425,7 +506,10 @@ function goToList() {
 
 // ===== INIT =====
 $('start-btn').addEventListener('click', start);
+$('clear-btn').addEventListener('click', onClearClick);
 counterBtn.addEventListener('click', increment);
+// Any tap is a chance to get the audio context running before the first hold.
+document.addEventListener('pointerdown', ensureAudio);
 $('reset-btn').addEventListener('click', reset);
 doneBtn.addEventListener('click', () => current && toggleDone(current.id));
 $('back-btn').addEventListener('click', goToList);
@@ -434,7 +518,15 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   ensureToday();
   wakeLock = null;
+  ensureAudio(); // iOS suspends the audio clock in the background
   tick();
+  // Re-queue the bell for any hold still running, on the resumed audio clock.
+  EXERCISES.forEach((ex) => {
+    const it = state.items[ex.id];
+    if (ex.hold && it && it.holdStart) {
+      scheduleBellIn((it.holdStart + ex.hold * 1000 - Date.now()) / 1000, ex.id);
+    }
+  });
   if (tickHandle) requestWakeLock();
   if (!started) renderWelcome();
   else if (current) renderExercise();

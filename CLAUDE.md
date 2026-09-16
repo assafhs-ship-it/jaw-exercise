@@ -12,7 +12,7 @@ Deployed via GitHub Pages from the `main` branch root (https://assafhs-ship-it.g
 
 ## Files
 
-- `index.html` — three screens: `#welcome-screen` (time-of-day greeting, date, today's progress, "Let's Start"), `#list-screen` (date, daily progress, exercise cards) and `#exercise-screen` (hero image, description, Counter with progress ring, hold timer, fixed action bar with איפוס / Done)
+- `index.html` — three screens: `#welcome-screen` (time-of-day greeting, date, today's progress, "Let's Start"), `#list-screen` (date, daily progress, "Clear All", exercise cards) and `#exercise-screen` (hero image, description, Counter with progress ring, hold timer, fixed action bar with איפוס / Done)
 - `script.js` — `EXERCISES` data array at the top, then state, list rendering, exercise rendering, counter/hold timer/done, bell sound, wake lock, routing
 - `styles.css` — design tokens on `:root`, dark-mode overrides in `@media (prefers-color-scheme: dark)`
 - `manifest.json`, `icons/` — Home Screen name and icons (`apple-touch-icon.png` is what iOS uses)
@@ -29,7 +29,8 @@ Deployed via GitHub Pages from the `main` branch root (https://assafhs-ship-it.g
 
 - **State** lives in `localStorage` under `jaw-exercise-v2`: `{ day, items: { [id]: { count, holdStart, done } } }`. It resets automatically on a new calendar day (checked on load and when the app returns to the foreground).
 - **Hold timer** stores a start timestamp, not a tick count. One global `tick()` ends every running hold, so a hold still finishes after leaving the screen or backgrounding; the bell only rings if the hold ended < 3s ago.
-- **Bell** is synthesized with Web Audio (inharmonic sine partials). iOS requires an unlocking tap, done in `unlockAudio()` on each Counter tap. iPhone silent mode mutes it.
+- **Bell** is synthesized with Web Audio (inharmonic sine partials) and **queued on the audio clock when the hold starts** (`scheduleBellIn`), so a throttled `setInterval` can't delay or skip it. When the hold ends, `bellDue()` rings immediately unless the queued bell already fired, and `cancelBell()` stops a queued bell on reset/Clear All — so each hold rings exactly once. iOS suspends the audio clock in the background, so `visibilitychange` resumes it and re-queues any running hold. `BELL_GRACE_MS` (60s) stops a long-finished hold ringing on return. iPhone silent mode still mutes it, hence the `chime` pulse on the timer as a visual cue.
+- **Clear All** (list screen) takes two taps: the first turns the button into a confirm state that expires after `CLEAR_CONFIRM_MS`; the second resets every count, hold and done mark for the day.
 - **Welcome** shows on every launch (any hash is cleared at startup). Greeting: בוקר טוב 05–12, צהריים טובים 12–17, ערב טוב otherwise. `route()` does nothing until `start()` sets `started`.
 - **Done** is disabled until the count reaches `DONE_AT` (10); a done mark can always be undone. Marking done on the detail screen returns to the list after 450ms.
 - **Routing** is by URL hash (`#open-wide`); `check` exercises are not routable.
