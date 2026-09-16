@@ -55,6 +55,7 @@ const EXERCISES = [
   },
 ];
 
+const APP_VERSION = 'V1.1'; // shown on the welcome screen; bump with each release
 const DONE_AT = 10; // Done unlocks once the counter reaches this
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
 const BELL_GRACE_MS = 60000; // don't ring for a hold that ended longer ago than this
@@ -136,6 +137,7 @@ function formattedToday() {
 }
 
 function renderWelcome() {
+  $('app-version').textContent = APP_VERSION;
   $('welcome-greeting').textContent = greeting();
   $('welcome-date').textContent = formattedToday();
   const doneCount = EXERCISES.filter((ex) => item(ex.id).done).length;
