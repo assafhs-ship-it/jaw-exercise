@@ -1,6 +1,8 @@
 // ===== EXERCISE DATA =====
 // kind: 'counter' opens a screen with a Counter button; 'check' is a list-only step.
 // hold: seconds — each Counter tap starts a timer that stops there and rings a bell.
+// holds + holdGap: several timers in a row instead (e.g. left then right), with a
+//   bell at the end of each and `holdGap` seconds between them.
 // goal: target number of reps, shown under the count.
 // counterLabel: text on the Counter button (defaults to "Counter").
 const EXERCISES = [
@@ -51,11 +53,16 @@ const EXERCISES = [
     image: 'images/side-to-side.svg',
     kind: 'counter',
     counterLabel: 'בזוגות',
+    holds: [
+      { label: 'שמאל', seconds: 10 },
+      { label: 'ימין', seconds: 10 },
+    ],
+    holdGap: 1,
     goal: 10,
   },
 ];
 
-const APP_VERSION = 'V1.1'; // shown on the welcome screen; bump with each release
+const APP_VERSION = 'V1.7'; // shown on the welcome screen; bump with each release
 const DONE_AT = 10; // Done unlocks once the counter reaches this
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
 const BELL_GRACE_MS = 60000; // don't ring for a hold that ended longer ago than this
@@ -65,14 +72,15 @@ const CLEAR_CONFIRM_MS = 5000; // how long "Clear All" waits for the confirming 
 // Saved to localStorage so progress survives iOS closing the app in the background.
 // Everything starts fresh each day.
 const STORAGE_KEY = 'jaw-exercise-v2';
-let state = loadState();   // { day, items: { [id]: { count, holdStart, done } } }
+let state = loadState();   // { day, items: { [id]: { count, holdStart, bellsDone, done } } }
 let started = false;       // false while the welcome screen is showing
 let current = null;        // the exercise currently open
 let finishedId = null;     // exercise whose hold just completed (shows "time's up")
 let tickHandle = null;
 let wakeLock = null;
 let audioCtx = null;
-let scheduledBell = null;  // { id, fireAt, nodes } — bell queued on the audio clock
+let scheduledBells = {};   // { 'exerciseId:phase': { fireAt, nodes } } — bells queued on the audio clock
+let scheduledTicks = {};   // { exerciseId: [oscillator] } — per-second ticks queued on the audio clock
 let clearConfirmHandle = null;
 
 function todayKey() {
@@ -107,8 +115,21 @@ function ensureToday() {
 }
 
 function item(id) {
-  if (!state.items[id]) state.items[id] = { count: 0, holdStart: null, done: false };
+  if (!state.items[id]) state.items[id] = { count: 0, holdStart: null, bellsDone: 0, done: false };
   return state.items[id];
+}
+
+// Timer phases for an exercise, in seconds from the Counter tap:
+// [{ label, seconds, start, end }]. Empty when the exercise has no timer.
+function holdPhases(ex) {
+  const defs = ex.holds || (ex.hold ? [{ label: '', seconds: ex.hold }] : []);
+  let t = 0;
+  return defs.map((def, i) => {
+    if (i > 0) t += ex.holdGap || 0;
+    const phase = { label: def.label || '', seconds: def.seconds, start: t, end: t + def.seconds };
+    t = phase.end;
+    return phase;
+  });
 }
 
 // ===== ELEMENTS =====
@@ -154,12 +175,27 @@ function start() {
   route();
 }
 
+// Back to the welcome screen from anywhere. Running timers keep going.
+function goHome() {
+  started = false;
+  current = null;
+  history.replaceState(null, '', location.pathname + location.search);
+  listScreen.hidden = true;
+  exerciseScreen.hidden = true;
+  renderWelcome();
+  welcomeScreen.hidden = false;
+  window.scrollTo(0, 0);
+}
+
 // ===== LIST SCREEN =====
 function metaFor(ex) {
   if (ex.kind === 'check') return ['בדיקה'];
   const parts = [];
-  if (ex.hold) parts.push(`טיימר ${ex.hold} שניות`);
-  else parts.push(ex.counterLabel ? `מונה ${ex.counterLabel}` : 'מונה');
+  const phases = holdPhases(ex);
+  if (ex.counterLabel) parts.push(ex.counterLabel);
+  if (phases.length === 1) parts.push(`טיימר ${phases[0].seconds} שניות`);
+  else if (phases.length > 1) parts.push(`טיימרים ${phases.map((p) => p.label).join(' + ')}`);
+  else if (!ex.counterLabel) parts.push('מונה');
   if (ex.goal) parts.push(`${ex.goal} חזרות`);
   return parts;
 }
@@ -234,7 +270,7 @@ function cancelClearConfirm() {
 function clearAll() {
   state = { day: todayKey(), items: {} };
   finishedId = null;
-  cancelBell();
+  cancelBells();
   stopTicking();
   saveState();
   renderList();
@@ -253,9 +289,19 @@ function openExercise(ex) {
   $('counter-label').textContent = ex.counterLabel || 'Counter';
   $('counter-goal').textContent = ex.goal ? `מתוך ${ex.goal}` : '';
   $('counter-goal').hidden = !ex.goal;
-  $('hold').hidden = !ex.hold;
-  $('hold-total').textContent = `מתוך ${ex.hold} שניות`;
-  $('ring').toggleAttribute('hidden', !ex.hold && !ex.goal); // SVG elements have no .hidden property
+  const phases = holdPhases(ex);
+  $('hold').hidden = !phases.length;
+  const timers = $('hold-timers');
+  timers.classList.toggle('is-multi', phases.length > 1);
+  timers.innerHTML = phases.map((p) => `
+    <div class="timer-card${phases.length === 1 ? ' is-solo' : ''}">
+      ${p.label ? `<span class="timer-label">${p.label}</span>` : ''}
+      <span class="timer-value">0</span>
+      <span class="timer-total">מתוך ${p.seconds} שניות</span>
+      ${phases.length > 1 ? '<span class="timer-bar"><span></span></span>' : ''}
+    </div>
+  `).join('');
+  $('ring').toggleAttribute('hidden', !phases.length && !ex.goal); // SVG elements have no .hidden property
 
   renderExercise();
   listScreen.hidden = true;
@@ -279,20 +325,38 @@ function renderExercise() {
   if (!current) return;
   const ex = current;
   const it = item(ex.id);
-  const running = Boolean(ex.hold && it.holdStart);
+  const phases = holdPhases(ex);
+  const running = Boolean(phases.length && it.holdStart);
 
   counterValue.textContent = it.count;
   counterBtn.classList.toggle('is-running', running);
 
   let progress = 0;
-  if (ex.hold) {
-    const elapsed = Math.min(holdElapsed(it), ex.hold);
-    progress = running ? elapsed / ex.hold : (finishedId === ex.id ? 1 : 0);
-    $('hold-value').textContent = running ? Math.floor(elapsed) : (finishedId === ex.id ? ex.hold : 0);
-    $('hold-status').textContent = running
-      ? 'מחזיקים…'
-      : finishedId === ex.id ? 'הזמן הסתיים' : 'לחצו על הכפתור כדי להתחיל';
-    $('hold').classList.toggle('is-finished', !running && finishedId === ex.id);
+  if (phases.length) {
+    const total = phases[phases.length - 1].end;
+    const finished = !running && finishedId === ex.id;
+    const elapsed = running ? Math.min(holdElapsed(it), total) : (finished ? total : 0);
+    progress = elapsed / total;
+
+    let status = running ? 'מתחלפים…' : 'לחצו על הכפתור כדי להתחיל';
+    const cards = $('hold-timers').children;
+    phases.forEach((p, i) => {
+      const card = cards[i];
+      if (!card) return;
+      const inPhase = Math.min(Math.max(elapsed - p.start, 0), p.seconds);
+      const active = running && elapsed >= p.start && elapsed < p.end;
+      const done = elapsed >= p.end;
+      card.querySelector('.timer-value').textContent = done ? p.seconds : Math.floor(inPhase);
+      const bar = card.querySelector('.timer-bar span');
+      if (bar) bar.style.width = `${(inPhase / p.seconds) * 100}%`;
+      card.classList.toggle('is-active', active);
+      card.classList.toggle('is-done', done);
+      card.classList.toggle('is-waiting', running && elapsed < p.start);
+      if (active) status = p.label ? `מחזיקים – ${p.label}` : 'מחזיקים…';
+    });
+    if (finished) status = 'הזמן הסתיים';
+    $('hold-status').textContent = status;
+    $('hold').classList.toggle('is-finished', finished);
   } else if (ex.goal) {
     progress = Math.min(it.count / ex.goal, 1);
   }
@@ -310,13 +374,15 @@ function increment() {
   if (!current) return;
   unlockAudio();
   const it = item(current.id);
-  if (current.hold && it.holdStart) return; // wait for the running hold to finish
+  const hasTimer = holdPhases(current).length > 0;
+  if (hasTimer && it.holdStart) return; // wait for the running hold to finish
 
   it.count += 1;
-  if (current.hold) {
+  if (hasTimer) {
     it.holdStart = Date.now();
+    it.bellsDone = 0;
     finishedId = null;
-    scheduleBellIn(current.hold, current.id);
+    scheduleBells(current, it);
     startTicking();
   }
   saveState();
@@ -332,8 +398,9 @@ function reset() {
   const it = item(current.id);
   it.count = 0;
   it.holdStart = null;
+  it.bellsDone = 0;
   finishedId = null;
-  cancelBell();
+  cancelBells(current.id);
   saveState();
   tick();
   renderExercise();
@@ -357,14 +424,30 @@ function tick() {
   let anyRunning = false;
   EXERCISES.forEach((ex) => {
     const it = state.items[ex.id];
-    if (!ex.hold || !it || !it.holdStart) return;
-    const overBy = Date.now() - (it.holdStart + ex.hold * 1000);
-    if (overBy >= 0) {
+    const phases = holdPhases(ex);
+    if (!phases.length || !it || !it.holdStart) return;
+    const elapsedMs = Date.now() - it.holdStart;
+
+    // Ring for each phase that has just ended. If several ended while the app
+    // was away, only the latest rings so they don't all sound at once.
+    let lastEnded = -1;
+    phases.forEach((p, i) => { if (elapsedMs >= p.end * 1000) lastEnded = i; });
+    const bellsDone = it.bellsDone || 0;
+    if (lastEnded >= bellsDone) {
+      for (let i = bellsDone; i <= lastEnded; i++) {
+        const overBy = elapsedMs - phases[i].end * 1000;
+        if (i === lastEnded && overBy < BELL_GRACE_MS) bellDue(ex.id, i);
+        else stopBell(ex.id, i);
+      }
+      it.bellsDone = lastEnded + 1;
+      saveState();
+    }
+
+    if (lastEnded === phases.length - 1) {
       it.holdStart = null;
+      it.bellsDone = 0;
       finishedId = ex.id;
       saveState();
-      if (overBy < BELL_GRACE_MS) bellDue(ex.id);
-      else cancelBell();
     } else {
       anyRunning = true;
     }
@@ -444,32 +527,75 @@ function ringBell(ctx, at) {
   return nodes;
 }
 
-// Queue the bell for `seconds` from now (re-queuing replaces any earlier one).
-function scheduleBellIn(seconds, id) {
+// A short, soft tick for each second that passes during a timer.
+function playTick(ctx, at) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 1150;
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(0.35, at + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.07);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(at);
+  osc.stop(at + 0.09);
+  return osc;
+}
+
+// Queue a bell for the end of every phase of this hold that hasn't rung yet,
+// plus a tick for every remaining whole second (the last second is the bell).
+// Re-queuing replaces the exercise's earlier bells and ticks.
+function scheduleBells(ex, it) {
   const ctx = ensureAudio();
   if (!ctx) return;
-  cancelBell();
-  const fireAt = ctx.currentTime + Math.max(seconds, 0);
-  scheduledBell = { id, fireAt, nodes: ringBell(ctx, fireAt) };
+  cancelBells(ex.id);
+  const elapsed = holdElapsed(it);
+  const ticks = [];
+  holdPhases(ex).forEach((p, i) => {
+    for (let s = 1; s < p.seconds; s++) {
+      const at = p.start + s;
+      if (at > elapsed + 0.05) ticks.push(playTick(ctx, ctx.currentTime + at - elapsed));
+    }
+    if (i < (it.bellsDone || 0)) return;
+    const fireAt = ctx.currentTime + Math.max(p.end - elapsed, 0);
+    scheduledBells[`${ex.id}:${i}`] = { fireAt, nodes: ringBell(ctx, fireAt) };
+  });
+  scheduledTicks[ex.id] = ticks;
 }
 
-function cancelBell() {
-  if (!scheduledBell) return;
-  scheduledBell.nodes.forEach((osc) => {
+function stopBell(id, phase) {
+  const key = `${id}:${phase}`;
+  const bell = scheduledBells[key];
+  if (!bell) return;
+  bell.nodes.forEach((osc) => {
     try { osc.stop(); } catch { /* already finished */ }
   });
-  scheduledBell = null;
+  delete scheduledBells[key];
 }
 
-// Called the moment a hold ends: ring now unless the queued bell already did.
-function bellDue(id) {
-  const alreadyRang = scheduledBell && scheduledBell.id === id && audioCtx
-    && audioCtx.currentTime >= scheduledBell.fireAt;
-  if (alreadyRang) {
-    scheduledBell = null;
+// Cancel the queued bells and ticks of one exercise, or of all exercises.
+function cancelBells(id) {
+  Object.keys(scheduledBells).forEach((key) => {
+    const [bellId, phase] = key.split(':');
+    if (!id || bellId === id) stopBell(bellId, phase);
+  });
+  Object.keys(scheduledTicks).forEach((tickId) => {
+    if (id && tickId !== id) return;
+    scheduledTicks[tickId].forEach((osc) => {
+      try { osc.stop(); } catch { /* already finished */ }
+    });
+    delete scheduledTicks[tickId];
+  });
+}
+
+// Called the moment a phase ends: ring now unless its queued bell already did.
+function bellDue(id, phase) {
+  const bell = scheduledBells[`${id}:${phase}`];
+  if (bell && audioCtx && audioCtx.currentTime >= bell.fireAt) {
+    delete scheduledBells[`${id}:${phase}`];
     return;
   }
-  cancelBell();
+  stopBell(id, phase);
   const ctx = ensureAudio();
   if (ctx) ringBell(ctx, ctx.currentTime + 0.02);
 }
@@ -515,6 +641,7 @@ document.addEventListener('pointerdown', ensureAudio);
 $('reset-btn').addEventListener('click', reset);
 doneBtn.addEventListener('click', () => current && toggleDone(current.id));
 $('back-btn').addEventListener('click', goToList);
+document.querySelectorAll('[data-home]').forEach((btn) => btn.addEventListener('click', goHome));
 window.addEventListener('hashchange', route);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
@@ -522,12 +649,10 @@ document.addEventListener('visibilitychange', () => {
   wakeLock = null;
   ensureAudio(); // iOS suspends the audio clock in the background
   tick();
-  // Re-queue the bell for any hold still running, on the resumed audio clock.
+  // Re-queue the bells for any hold still running, on the resumed audio clock.
   EXERCISES.forEach((ex) => {
     const it = state.items[ex.id];
-    if (ex.hold && it && it.holdStart) {
-      scheduleBellIn((it.holdStart + ex.hold * 1000 - Date.now()) / 1000, ex.id);
-    }
+    if (it && it.holdStart) scheduleBells(ex, it);
   });
   if (tickHandle) requestWakeLock();
   if (!started) renderWelcome();

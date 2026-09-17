@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Frank+Ruhl+Libre:wght@400;500&display=swap">
   <!-- Bump ?v= on every change so phones don't reuse a cached old copy -->
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 
@@ -52,6 +52,12 @@
   <!-- Exercise list -->
   <main id="list-screen" class="screen" hidden>
     <header class="list-header">
+      <div class="top-bar">
+        <button class="home-btn" type="button" data-home aria-label="חזרה למסך הפתיחה">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5L12 5l8 6.5M6.5 10v9h4v-5.5h3V19h4v-9"/></svg>
+          <span>Home</span>
+        </button>
+      </div>
       <p id="today-date" class="eyebrow"></p>
       <h1>תרגילי לסת</h1>
       <div class="progress">
@@ -69,7 +75,13 @@
       <button id="back-btn" class="icon-btn" type="button" aria-label="חזרה לרשימה">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
       </button>
-      <p id="ex-position" class="eyebrow"></p>
+      <div class="detail-top-end">
+        <p id="ex-position" class="eyebrow"></p>
+        <button class="home-btn" type="button" data-home aria-label="חזרה למסך הפתיחה">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5L12 5l8 6.5M6.5 10v9h4v-5.5h3V19h4v-9"/></svg>
+          <span>Home</span>
+        </button>
+      </div>
     </header>
 
     <figure class="hero">
@@ -93,10 +105,7 @@
       </div>
 
       <div id="hold" class="hold">
-        <p class="hold-readout">
-          <span id="hold-value" class="hold-value">0</span>
-          <span id="hold-total" class="hold-total">מתוך 10 שניות</span>
-        </p>
+        <div id="hold-timers" class="hold-timers"></div>
         <p id="hold-status" class="hold-status"></p>
       </div>
     </section>
@@ -109,6 +118,6 @@
     </footer>
   </main>
 
-  <script src="script.js?v=6"></script>
+  <script src="script.js?v=7"></script>
 </body>
 </html>
