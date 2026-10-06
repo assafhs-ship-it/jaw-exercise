@@ -22,7 +22,8 @@ Deployed via GitHub Pages from the `main` branch root (https://assafhs-ship-it.g
 
 - `kind: 'counter'` — opens a detail screen. `kind: 'check'` — list-only step, not openable; its Done pill sits on the card.
 - `hold: 10` — each Counter tap increments and starts a count-up timer that stops at `hold` seconds and rings a bell; taps are ignored while it runs.
-- `holds: [{ label, seconds }]` + `holdGap` — several timers in sequence instead of one (exercise 6: שמאל 10s, 1s gap, ימין 10s). Rendered as side-by-side cards, left-to-right. `holdPhases(ex)` normalizes `hold`/`holds` into `[{ label, seconds, start, end }]` — use it rather than reading `hold` directly.
+- `holds: [{ label, seconds }]` + `holdGap` — several timers in sequence instead of one, each ending with its own bell. Used by exercises 2 (מניעה → סגירה), 4 (לחץ → סגירה) and 6 (שמאל → ימין), all 10s + 1s gap + 10s. Rendered as side-by-side cards. `holdPhases(ex)` normalizes `hold`/`holds` into `[{ label, seconds, start, end }]` — use it rather than reading `hold` directly.
+- `timerOrder: 'ltr'` — lay the timer cards out left-to-right instead of the default right-to-left. Only for exercise 6, where the labels are the physical sides of the jaw; elsewhere the first phase belongs on the right.
 - `goal: 10` — shows "מתוך 10" under the count and drives the progress ring (for non-hold exercises).
 - `counterLabel` — text on the Counter button (default "Counter").
 

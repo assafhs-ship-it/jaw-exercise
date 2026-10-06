@@ -529,13 +529,15 @@ a.card:active { transform: scale(0.985); }
 /* ===== HOLD TIMERS ===== */
 .hold { width: 100%; margin-top: 22px; text-align: center; }
 
-/* Left timer sits on the left, so lay the row out left-to-right. */
+/* Phases read right-to-left like the rest of the app; `is-ltr` flips that for
+   exercises whose timers are the left and right side of the jaw. */
 .hold-timers {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 12px;
-  direction: ltr;
 }
+
+.hold-timers.is-ltr { direction: ltr; }
 
 .timer-card {
   direction: rtl;

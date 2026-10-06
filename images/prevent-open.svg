@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#eef2ec"/>
+    <stop offset="1" stop-color="#f6efe4"/>
+  </linearGradient>
+</defs>
+<rect width="400" height="300" fill="url(#bg)"/>
+<circle cx="200" cy="158" r="132" fill="#ffffff" opacity="0.55"/>
+<g stroke-linecap="round" stroke-linejoin="round">
+
+<path d="M56 300 C80 276 128 268 172 266 M344 300 C320 276 272 268 228 266" stroke="#24332f" stroke-width="4" fill="none"/>
+<path d="M178 238 L172 300 M222 238 L228 300" stroke="#24332f" stroke-width="4" fill="none"/>
+<path d="M126 124 C106 116 102 162 126 168" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
+<path d="M274 124 C294 116 298 162 274 168" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
+<path d="M122 140 C122 72 160 44 200 44 C240 44 278 72 278 140 C278 202 248 252 200 252 C152 252 122 202 122 140 Z" stroke="#24332f" stroke-width="4" fill="#fdf9f3"/>
+<path d="M120 138 C110 66 158 36 200 38 C244 36 292 64 280 138 C272 104 252 86 226 84 C204 82 176 92 156 92 C138 94 126 112 120 138 Z" fill="#24332f"/>
+<path d="M160 130 Q171 137 182 130 M218 130 Q229 137 240 130" stroke="#24332f" stroke-width="3.5" fill="none"/>
+<path d="M200 142 Q193 162 199 168 Q205 171 209 166" stroke="#24332f" stroke-width="3" fill="none"/>
+<ellipse cx="200" cy="208" rx="24" ry="9" fill="#5b3b40" stroke="#24332f" stroke-width="3.5"/>
+<g transform="rotate(-12 200 280)"><line x1="196" y1="300" x2="150" y2="352" stroke="#24332f" stroke-width="52"/><line x1="196" y1="300" x2="150" y2="352" stroke="#f1e1cf" stroke-width="45"/><rect x="146" y="246" width="108" height="74" rx="30" fill="#f1e1cf" stroke="#24332f" stroke-width="4"/><path d="M174 252 V280 M201 250 V280 M228 252 V280" stroke="#24332f" stroke-width="3" fill="none"/><path d="M154 294 C178 306 228 306 252 294" stroke="#24332f" stroke-width="3" fill="none"/></g><line x1="74" y1="176" x2="74.0" y2="230.0" stroke="#2f6b5c" stroke-width="6"/><polygon points="74,248 62.0,230.0 86.0,230.0" fill="#2f6b5c" stroke="#2f6b5c" stroke-width="3"/><line x1="326" y1="250" x2="326.0" y2="198.0" stroke="#b58d52" stroke-width="6"/><polygon points="326,180 338.0,198.0 314.0,198.0" fill="#b58d52" stroke="#b58d52" stroke-width="3"/>
+</g>
+</svg>

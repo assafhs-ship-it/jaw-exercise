@@ -16,11 +16,16 @@ const EXERCISES = [
     goal: 10,
   },
   {
-    id: 'wide-fingers',
-    title: 'פה גדול עם אצבעות',
-    description: 'לפתוח פה גדול ולהניח אצבע על השיניים התחתונות ולמתוח למטה לפתיחה. 5 מתיחות, 10 פעמים.',
-    image: 'images/wide-fingers.svg',
+    id: 'prevent-open',
+    title: 'מניעת פתיחה',
+    description: 'להניח אגרוף מתחת ללסת ולנסות לפתוח את הפה כנגד האגרוף במשך 10 שניות, ואז לסגור את הלסת בחוזקה למשך 10 שניות.',
+    image: 'images/prevent-open.svg',
     kind: 'counter',
+    holds: [
+      { label: 'מניעה', seconds: 10 },
+      { label: 'סגירה', seconds: 10 },
+    ],
+    holdGap: 1,
     goal: 10,
   },
   {
@@ -32,10 +37,14 @@ const EXERCISES = [
   {
     id: 'close-resist',
     title: 'סגירה עם לחץ',
-    description: 'להניח 2 אצבעות על הטוחנות התחתונות ולנסות לסגור את הפה, והאצבעות מתנגדות לכיוון פתיחה.',
+    description: 'להניח 2 אצבעות על הטוחנות התחתונות ולנסות לסגור את הפה, והאצבעות מתנגדות לכיוון פתיחה. לאחר מכן לסגור את הלסת בחוזקה למשך 10 שניות.',
     image: 'images/close-resist.svg',
     kind: 'counter',
-    hold: 10,
+    holds: [
+      { label: 'לחץ', seconds: 10 },
+      { label: 'סגירה', seconds: 10 },
+    ],
+    holdGap: 1,
     goal: 10,
   },
   {
@@ -58,11 +67,12 @@ const EXERCISES = [
       { label: 'ימין', seconds: 10 },
     ],
     holdGap: 1,
+    timerOrder: 'ltr', // these two are sides of the jaw, so שמאל really sits on the left
     goal: 10,
   },
 ];
 
-const APP_VERSION = 'V1.7'; // shown on the welcome screen; bump with each release
+const APP_VERSION = 'V1.8'; // shown on the welcome screen; bump with each release
 const DONE_AT = 10; // Done unlocks once the counter reaches this
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
 const BELL_GRACE_MS = 60000; // don't ring for a hold that ended longer ago than this
@@ -293,6 +303,7 @@ function openExercise(ex) {
   $('hold').hidden = !phases.length;
   const timers = $('hold-timers');
   timers.classList.toggle('is-multi', phases.length > 1);
+  timers.classList.toggle('is-ltr', ex.timerOrder === 'ltr');
   timers.innerHTML = phases.map((p) => `
     <div class="timer-card${phases.length === 1 ? ' is-solo' : ''}">
       ${p.label ? `<span class="timer-label">${p.label}</span>` : ''}
