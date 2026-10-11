@@ -72,9 +72,9 @@ const EXERCISES = [
   },
 ];
 
-const APP_VERSION = 'V2.1'; // shown on the welcome screen; bump with each release
+const APP_VERSION = 'V2.2'; // shown on the welcome screen; bump with each release
 const DONE_AT = 10; // Done unlocks once this many cycles are finished
-const AUTO_REST_MS = 2000; // pause between cycles when automatic counting is on
+const AUTO_REST_MS = 1000; // pause between cycles when automatic counting is on
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
 const BELL_GRACE_MS = 60000; // don't ring for a hold that ended longer ago than this
 const CLEAR_CONFIRM_MS = 5000; // how long "Clear All" waits for the confirming tap
