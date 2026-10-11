@@ -72,7 +72,7 @@ const EXERCISES = [
   },
 ];
 
-const APP_VERSION = 'V1.9'; // shown on the welcome screen; bump with each release
+const APP_VERSION = 'V2.0'; // shown on the welcome screen; bump with each release
 const DONE_AT = 10; // Done unlocks once this many cycles are finished
 const AUTO_REST_MS = 2000; // pause between cycles when automatic counting is on
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
@@ -127,7 +127,10 @@ function ensureToday() {
 
 function item(id) {
   if (!state.items[id]) {
-    state.items[id] = { count: 0, holdStart: null, bellsDone: 0, nextStart: null, auto: false, done: false };
+    state.items[id] = {
+      count: 0, holdStart: null, bellsDone: 0, nextStart: null,
+      paused: false, pausedElapsed: null, pausedRest: null, auto: false, done: false,
+    };
   }
   return state.items[id];
 }
@@ -196,6 +199,7 @@ function start() {
 // Back to the welcome screen from anywhere. Running timers keep going.
 function goHome() {
   started = false;
+  if (current) pauseExercise(current); // leaving an exercise pauses its count
   current = null;
   history.replaceState(null, '', location.pathname + location.search);
   listScreen.hidden = true;
@@ -321,6 +325,8 @@ function openExercise(ex) {
       ${phases.length > 1 ? '<span class="timer-bar"><span></span></span>' : ''}
     </div>
   `).join('');
+  $('pause-btn').hidden = !phases.length;
+  $('action-bar-inner').classList.toggle('has-pause', phases.length > 0);
   $('ring').toggleAttribute('hidden', !phases.length && !ex.goal); // SVG elements have no .hidden property
 
   renderExercise();
@@ -330,6 +336,7 @@ function openExercise(ex) {
 }
 
 function closeExercise() {
+  if (current) pauseExercise(current); // leaving an exercise pauses its count
   current = null;
   renderList();
   exerciseScreen.hidden = true;
@@ -348,16 +355,26 @@ function renderExercise() {
   const phases = holdPhases(ex);
   const running = Boolean(phases.length && it.holdStart);
   const resting = Boolean(phases.length && it.nextStart); // waiting to start the next cycle
+  const paused = Boolean(phases.length && it.paused);
+  const pausedInHold = paused && it.pausedRest === null; // paused mid-hold, not mid-rest
 
   counterValue.textContent = it.count;
-  counterBtn.classList.toggle('is-running', running || resting);
+  counterBtn.classList.toggle('is-running', running || resting || paused);
   $('auto-toggle').checked = Boolean(it.auto);
+
+  const pauseBtn = $('pause-btn');
+  pauseBtn.disabled = !running && !resting && !paused;
+  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  pauseBtn.classList.toggle('is-paused', paused);
 
   let progress = 0;
   if (phases.length) {
     const total = phases[phases.length - 1].end;
-    const finished = !running && (resting || finishedId === ex.id);
-    const elapsed = running ? Math.min(holdElapsed(it), total) : (finished ? total : 0);
+    const finished = !running && !pausedInHold && (resting || finishedId === ex.id);
+    const held = running || pausedInHold;
+    const elapsed = running ? Math.min(holdElapsed(it), total)
+      : pausedInHold ? Math.min((it.pausedElapsed || 0) / 1000, total)
+        : (finished ? total : 0);
     progress = elapsed / total;
 
     let status = running ? 'מתחלפים…' : 'לחצו על הכפתור כדי להתחיל';
@@ -366,20 +383,21 @@ function renderExercise() {
       const card = cards[i];
       if (!card) return;
       const inPhase = Math.min(Math.max(elapsed - p.start, 0), p.seconds);
-      const active = running && elapsed >= p.start && elapsed < p.end;
+      const active = held && elapsed >= p.start && elapsed < p.end;
       const done = elapsed >= p.end;
       card.querySelector('.timer-value').textContent = done ? p.seconds : Math.floor(inPhase);
       const bar = card.querySelector('.timer-bar span');
       if (bar) bar.style.width = `${(inPhase / p.seconds) * 100}%`;
       card.classList.toggle('is-active', active);
       card.classList.toggle('is-done', done);
-      card.classList.toggle('is-waiting', running && elapsed < p.start);
+      card.classList.toggle('is-waiting', held && elapsed < p.start);
       if (active) status = p.label ? `מחזיקים – ${p.label}` : 'מחזיקים…';
     });
     if (finished) status = 'הזמן הסתיים';
     if (resting) {
       status = `הסיבוב הבא בעוד ${Math.max(1, Math.ceil((it.nextStart - Date.now()) / 1000))}`;
     }
+    if (paused) status = 'מושהה';
     $('hold-status').textContent = status;
     $('hold').classList.toggle('is-finished', finished);
   } else if (ex.goal) {
@@ -389,7 +407,7 @@ function renderExercise() {
   ringFill.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - progress);
 
   // Done unlocks only once the last cycle has actually finished (a done mark can always be undone).
-  doneBtn.disabled = !it.done && (it.count < DONE_AT || running || resting);
+  doneBtn.disabled = !it.done && (it.count < DONE_AT || running || resting || paused);
   doneBtn.classList.toggle('is-done', it.done);
   doneBtn.innerHTML = it.done ? `${CHECK_SVG}<span>Done</span>` : 'Done';
 }
@@ -401,6 +419,9 @@ function startCycle(ex, it) {
   it.holdStart = Date.now();
   it.bellsDone = 0;
   it.nextStart = null;
+  it.paused = false;
+  it.pausedElapsed = null;
+  it.pausedRest = null;
   finishedId = null;
   scheduleBells(ex, it);
   saveState();
@@ -414,7 +435,7 @@ function increment() {
   const hasTimer = holdPhases(current).length > 0;
 
   if (hasTimer) {
-    if (it.holdStart || it.nextStart) return; // a cycle is already under way
+    if (it.holdStart || it.nextStart || it.paused) return; // a cycle is already under way
     startCycle(current, it);
   } else {
     it.count += 1;
@@ -434,11 +455,59 @@ function reset() {
   it.holdStart = null;
   it.bellsDone = 0;
   it.nextStart = null;
+  it.paused = false;
+  it.pausedElapsed = null;
+  it.pausedRest = null;
   it.auto = false;
   finishedId = null;
   cancelBells(current.id);
   saveState();
   tick();
+  renderExercise();
+}
+
+// ===== PAUSE =====
+// Pausing freezes how far into the cycle you are, so resuming carries on from
+// the same second. Queued sounds are dropped and re-queued on resume.
+function pauseExercise(ex) {
+  const it = state.items[ex.id];
+  if (!it || it.paused) return;
+  if (it.holdStart) {
+    it.pausedElapsed = Date.now() - it.holdStart;
+    it.holdStart = null;
+  } else if (it.nextStart) {
+    it.pausedRest = Math.max(it.nextStart - Date.now(), 0);
+    it.nextStart = null;
+  } else {
+    return; // nothing is running
+  }
+  it.paused = true;
+  cancelBells(ex.id);
+  saveState();
+}
+
+function resumeExercise(ex) {
+  const it = state.items[ex.id];
+  if (!it || !it.paused) return;
+  if (it.pausedRest !== null) {
+    it.nextStart = Date.now() + it.pausedRest;
+  } else {
+    it.holdStart = Date.now() - (it.pausedElapsed || 0);
+    scheduleBells(ex, it);
+  }
+  it.paused = false;
+  it.pausedElapsed = null;
+  it.pausedRest = null;
+  saveState();
+  startTicking();
+}
+
+function togglePause() {
+  if (!current) return;
+  unlockAudio();
+  const it = item(current.id);
+  if (it.paused) resumeExercise(current);
+  else pauseExercise(current);
   renderExercise();
 }
 
@@ -449,7 +518,7 @@ function toggleAuto() {
   const it = item(current.id);
   it.auto = $('auto-toggle').checked;
   if (it.auto) {
-    if (!it.holdStart && !it.nextStart && it.count < targetFor(current)) startCycle(current, it);
+    if (!it.holdStart && !it.nextStart && !it.paused && it.count < targetFor(current)) startCycle(current, it);
   } else {
     it.nextStart = null; // a cycle already running still finishes
   }
@@ -704,6 +773,7 @@ $('start-btn').addEventListener('click', start);
 $('clear-btn').addEventListener('click', onClearClick);
 counterBtn.addEventListener('click', increment);
 $('auto-toggle').addEventListener('change', toggleAuto);
+$('pause-btn').addEventListener('click', togglePause);
 // Any tap is a chance to get the audio context running before the first hold.
 document.addEventListener('pointerdown', ensureAudio);
 $('reset-btn').addEventListener('click', reset);

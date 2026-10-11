@@ -712,6 +712,15 @@ a.card:active { transform: scale(0.985); }
   gap: 10px;
 }
 
+/* Timed exercises also get a Pause button in the middle. */
+.action-bar-inner.has-pause { grid-template-columns: 1fr 1fr 1.5fr; }
+
+.btn-pause.is-paused {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
