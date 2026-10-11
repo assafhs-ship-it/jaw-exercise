@@ -72,7 +72,7 @@ const EXERCISES = [
   },
 ];
 
-const APP_VERSION = 'V2.0'; // shown on the welcome screen; bump with each release
+const APP_VERSION = 'V2.1'; // shown on the welcome screen; bump with each release
 const DONE_AT = 10; // Done unlocks once this many cycles are finished
 const AUTO_REST_MS = 2000; // pause between cycles when automatic counting is on
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
@@ -102,7 +102,10 @@ function todayKey() {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved && saved.day === todayKey()) return saved;
+    if (saved && saved.day === todayKey() && saved.items) {
+      Object.values(saved.items).forEach(normalizeItem);
+      return saved;
+    }
   } catch {
     // fall through to a fresh day
   }
@@ -125,14 +128,25 @@ function ensureToday() {
   }
 }
 
+const ITEM_DEFAULTS = {
+  count: 0, holdStart: null, bellsDone: 0, nextStart: null,
+  paused: false, pausedElapsed: null, pausedRest: null, auto: false, done: false,
+};
+
+// Saved state from an older version can be missing newer fields, so fill them
+// in. A missing field used to read as `undefined` and broke Resume.
+function normalizeItem(it) {
+  Object.keys(ITEM_DEFAULTS).forEach((key) => {
+    if (it[key] === undefined || (typeof ITEM_DEFAULTS[key] === 'number' && !Number.isFinite(it[key]) && it[key] !== null)) {
+      it[key] = ITEM_DEFAULTS[key];
+    }
+  });
+  return it;
+}
+
 function item(id) {
-  if (!state.items[id]) {
-    state.items[id] = {
-      count: 0, holdStart: null, bellsDone: 0, nextStart: null,
-      paused: false, pausedElapsed: null, pausedRest: null, auto: false, done: false,
-    };
-  }
-  return state.items[id];
+  if (!state.items[id]) state.items[id] = Object.assign({}, ITEM_DEFAULTS);
+  return normalizeItem(state.items[id]);
 }
 
 // How many cycles this exercise is aiming for.
@@ -356,7 +370,7 @@ function renderExercise() {
   const running = Boolean(phases.length && it.holdStart);
   const resting = Boolean(phases.length && it.nextStart); // waiting to start the next cycle
   const paused = Boolean(phases.length && it.paused);
-  const pausedInHold = paused && it.pausedRest === null; // paused mid-hold, not mid-rest
+  const pausedInHold = paused && !Number.isFinite(it.pausedRest); // paused mid-hold, not mid-rest
 
   counterValue.textContent = it.count;
   counterBtn.classList.toggle('is-running', running || resting || paused);
@@ -489,10 +503,10 @@ function pauseExercise(ex) {
 function resumeExercise(ex) {
   const it = state.items[ex.id];
   if (!it || !it.paused) return;
-  if (it.pausedRest !== null) {
+  if (Number.isFinite(it.pausedRest)) {
     it.nextStart = Date.now() + it.pausedRest;
   } else {
-    it.holdStart = Date.now() - (it.pausedElapsed || 0);
+    it.holdStart = Date.now() - (Number.isFinite(it.pausedElapsed) ? it.pausedElapsed : 0);
     scheduleBells(ex, it);
   }
   it.paused = false;
