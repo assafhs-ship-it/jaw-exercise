@@ -72,8 +72,9 @@ const EXERCISES = [
   },
 ];
 
-const APP_VERSION = 'V1.8'; // shown on the welcome screen; bump with each release
-const DONE_AT = 10; // Done unlocks once the counter reaches this
+const APP_VERSION = 'V1.9'; // shown on the welcome screen; bump with each release
+const DONE_AT = 10; // Done unlocks once this many cycles are finished
+const AUTO_REST_MS = 2000; // pause between cycles when automatic counting is on
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
 const BELL_GRACE_MS = 60000; // don't ring for a hold that ended longer ago than this
 const CLEAR_CONFIRM_MS = 5000; // how long "Clear All" waits for the confirming tap
@@ -125,8 +126,15 @@ function ensureToday() {
 }
 
 function item(id) {
-  if (!state.items[id]) state.items[id] = { count: 0, holdStart: null, bellsDone: 0, done: false };
+  if (!state.items[id]) {
+    state.items[id] = { count: 0, holdStart: null, bellsDone: 0, nextStart: null, auto: false, done: false };
+  }
   return state.items[id];
+}
+
+// How many cycles this exercise is aiming for.
+function targetFor(ex) {
+  return ex.goal || DONE_AT;
 }
 
 // Timer phases for an exercise, in seconds from the Counter tap:
@@ -301,6 +309,7 @@ function openExercise(ex) {
   $('counter-goal').hidden = !ex.goal;
   const phases = holdPhases(ex);
   $('hold').hidden = !phases.length;
+  $('auto-row').hidden = !phases.length; // only timed exercises can run themselves
   const timers = $('hold-timers');
   timers.classList.toggle('is-multi', phases.length > 1);
   timers.classList.toggle('is-ltr', ex.timerOrder === 'ltr');
@@ -338,14 +347,16 @@ function renderExercise() {
   const it = item(ex.id);
   const phases = holdPhases(ex);
   const running = Boolean(phases.length && it.holdStart);
+  const resting = Boolean(phases.length && it.nextStart); // waiting to start the next cycle
 
   counterValue.textContent = it.count;
-  counterBtn.classList.toggle('is-running', running);
+  counterBtn.classList.toggle('is-running', running || resting);
+  $('auto-toggle').checked = Boolean(it.auto);
 
   let progress = 0;
   if (phases.length) {
     const total = phases[phases.length - 1].end;
-    const finished = !running && finishedId === ex.id;
+    const finished = !running && (resting || finishedId === ex.id);
     const elapsed = running ? Math.min(holdElapsed(it), total) : (finished ? total : 0);
     progress = elapsed / total;
 
@@ -366,6 +377,9 @@ function renderExercise() {
       if (active) status = p.label ? `מחזיקים – ${p.label}` : 'מחזיקים…';
     });
     if (finished) status = 'הזמן הסתיים';
+    if (resting) {
+      status = `הסיבוב הבא בעוד ${Math.max(1, Math.ceil((it.nextStart - Date.now()) / 1000))}`;
+    }
     $('hold-status').textContent = status;
     $('hold').classList.toggle('is-finished', finished);
   } else if (ex.goal) {
@@ -374,29 +388,38 @@ function renderExercise() {
   ringFill.style.strokeDasharray = RING_CIRCUMFERENCE;
   ringFill.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - progress);
 
-  // Done stays locked until the target is reached (but a done mark can always be undone).
-  doneBtn.disabled = !it.done && it.count < DONE_AT;
+  // Done unlocks only once the last cycle has actually finished (a done mark can always be undone).
+  doneBtn.disabled = !it.done && (it.count < DONE_AT || running || resting);
   doneBtn.classList.toggle('is-done', it.done);
   doneBtn.innerHTML = it.done ? `${CHECK_SVG}<span>Done</span>` : 'Done';
 }
 
 // ===== COUNTER, HOLD TIMER & DONE =====
+// One cycle = count + 1, then every timer phase of the exercise in turn.
+function startCycle(ex, it) {
+  it.count += 1;
+  it.holdStart = Date.now();
+  it.bellsDone = 0;
+  it.nextStart = null;
+  finishedId = null;
+  scheduleBells(ex, it);
+  saveState();
+  startTicking();
+}
+
 function increment() {
   if (!current) return;
   unlockAudio();
   const it = item(current.id);
   const hasTimer = holdPhases(current).length > 0;
-  if (hasTimer && it.holdStart) return; // wait for the running hold to finish
 
-  it.count += 1;
   if (hasTimer) {
-    it.holdStart = Date.now();
-    it.bellsDone = 0;
-    finishedId = null;
-    scheduleBells(current, it);
-    startTicking();
+    if (it.holdStart || it.nextStart) return; // a cycle is already under way
+    startCycle(current, it);
+  } else {
+    it.count += 1;
+    saveState();
   }
-  saveState();
   renderExercise();
 
   counterValue.classList.remove('bump');
@@ -410,10 +433,27 @@ function reset() {
   it.count = 0;
   it.holdStart = null;
   it.bellsDone = 0;
+  it.nextStart = null;
+  it.auto = false;
   finishedId = null;
   cancelBells(current.id);
   saveState();
   tick();
+  renderExercise();
+}
+
+// Automatic counting: cycles start by themselves until the target is reached.
+function toggleAuto() {
+  if (!current) return;
+  unlockAudio();
+  const it = item(current.id);
+  it.auto = $('auto-toggle').checked;
+  if (it.auto) {
+    if (!it.holdStart && !it.nextStart && it.count < targetFor(current)) startCycle(current, it);
+  } else {
+    it.nextStart = null; // a cycle already running still finishes
+  }
+  saveState();
   renderExercise();
 }
 
@@ -436,7 +476,15 @@ function tick() {
   EXERCISES.forEach((ex) => {
     const it = state.items[ex.id];
     const phases = holdPhases(ex);
-    if (!phases.length || !it || !it.holdStart) return;
+    if (!phases.length || !it) return;
+
+    if (it.nextStart) {
+      // Resting between automatic cycles.
+      if (Date.now() >= it.nextStart) startCycle(ex, it);
+      anyRunning = true;
+      return;
+    }
+    if (!it.holdStart) return;
     const elapsedMs = Date.now() - it.holdStart;
 
     // Ring for each phase that has just ended. If several ended while the app
@@ -458,6 +506,14 @@ function tick() {
       it.holdStart = null;
       it.bellsDone = 0;
       finishedId = ex.id;
+      if (it.auto) {
+        if (it.count < targetFor(ex)) {
+          it.nextStart = Date.now() + AUTO_REST_MS;
+          anyRunning = true;
+        } else {
+          it.auto = false; // all the cycles are done
+        }
+      }
       saveState();
     } else {
       anyRunning = true;
@@ -647,6 +703,7 @@ function goToList() {
 $('start-btn').addEventListener('click', start);
 $('clear-btn').addEventListener('click', onClearClick);
 counterBtn.addEventListener('click', increment);
+$('auto-toggle').addEventListener('change', toggleAuto);
 // Any tap is a chance to get the audio context running before the first hold.
 document.addEventListener('pointerdown', ensureAudio);
 $('reset-btn').addEventListener('click', reset);
@@ -673,5 +730,5 @@ document.addEventListener('visibilitychange', () => {
 
 // Every launch opens on the welcome screen.
 history.replaceState(null, '', location.pathname + location.search);
-if (Object.values(state.items).some((it) => it.holdStart)) startTicking();
+if (Object.values(state.items).some((it) => it.holdStart || it.nextStart)) startTicking();
 renderWelcome();

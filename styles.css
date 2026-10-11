@@ -630,6 +630,64 @@ a.card:active { transform: scale(0.985); }
 
 .hold.is-finished .hold-status { color: var(--gold); }
 
+/* ===== AUTOMATIC COUNTING ===== */
+.auto-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 24px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  cursor: pointer;
+}
+
+.auto-text { flex: 1; display: flex; flex-direction: column; text-align: start; }
+
+.auto-title { font-size: 17px; font-weight: 600; }
+
+.auto-hint { font-size: 14px; color: var(--muted); }
+
+/* The checkbox stays for behaviour and accessibility; the switch is drawn. */
+.auto-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.auto-switch {
+  flex: none;
+  position: relative;
+  width: 54px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background 0.25s ease;
+}
+
+.auto-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  inset-inline-start: 3px; /* RTL: the knob rests on the right */
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(28, 40, 38, 0.3);
+  transition: transform 0.25s cubic-bezier(0.3, 1.3, 0.6, 1);
+}
+
+.auto-input:checked ~ .auto-switch { background: var(--green-2); }
+
+/* RTL: the knob travels to the left when switched on. */
+.auto-input:checked ~ .auto-switch::after { transform: translateX(-22px); }
+
+.auto-input:focus-visible ~ .auto-switch { outline: 2px solid var(--gold); outline-offset: 3px; }
+
 /* ===== ACTION BAR ===== */
 .action-bar {
   position: fixed;

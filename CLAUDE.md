@@ -12,7 +12,7 @@ Deployed via GitHub Pages from the `main` branch root (https://assafhs-ship-it.g
 
 ## Files
 
-- `index.html` — three screens: `#welcome-screen` (time-of-day greeting, date, today's progress, "Let's Start", app version), `#list-screen` (Home, date, daily progress, "Clear All", exercise cards) and `#exercise-screen` (back, Home, hero image, description, Counter with progress ring, timer cards, fixed action bar with איפוס / Done)
+- `index.html` — three screens: `#welcome-screen` (time-of-day greeting, date, today's progress, "Let's Start", app version), `#list-screen` (Home, date, daily progress, "Clear All", exercise cards) and `#exercise-screen` (back, Home, hero image, description, Counter with progress ring, timer cards, automatic-counting switch, fixed action bar with איפוס / Done)
 - `script.js` — `EXERCISES` data array at the top, then state, list rendering, exercise rendering, counter/hold timer/done, bell sound, wake lock, routing
 - `styles.css` — design tokens on `:root`, dark-mode overrides in `@media (prefers-color-scheme: dark)`
 - `manifest.json`, `icons/` — Home Screen name and icons (`apple-touch-icon.png` is what iOS uses)
@@ -35,7 +35,8 @@ Deployed via GitHub Pages from the `main` branch root (https://assafhs-ship-it.g
 - **Sounds** are synthesized with Web Audio and **queued on the audio clock when the hold starts** (`scheduleBells`): a soft tick (`playTick`) every second and a bell (`ringBell`, inharmonic partials) at the end of each phase instead of that phase's last tick. A throttled `setInterval` therefore can't delay or skip them. When a phase ends, `bellDue(id, phase)` rings immediately unless its queued bell already fired, and `cancelBells(id)` stops queued bells and ticks on reset/Clear All — so each phase rings exactly once. iOS suspends the audio clock in the background, so `visibilitychange` resumes it and re-queues the remaining bells and ticks of any running hold. `BELL_GRACE_MS` (60s) stops a long-finished hold ringing on return. iPhone silent mode still mutes all sounds, hence the `chime` pulse on each timer card as a visual cue.
 - **Clear All** (list screen) takes two taps: the first turns the button into a confirm state that expires after `CLEAR_CONFIRM_MS`; the second resets every count, hold and done mark for the day.
 - **Welcome** shows on every launch (any hash is cleared at startup) and via the Home buttons (`[data-home]` → `goHome()`, which leaves running timers going). Greeting: בוקר טוב 05–12, צהריים טובים 12–17, ערב טוב otherwise. `route()` does nothing until `start()` sets `started`.
-- **Done** is disabled until the count reaches `DONE_AT` (10); a done mark can always be undone. Marking done on the detail screen returns to the list after 450ms.
+- **Cycles**: one cycle = `startCycle()` (count + 1, then every timer phase). `it.auto` turns on automatic counting for exercises that have timers: when a cycle ends, `tick()` sets `it.nextStart = now + AUTO_REST_MS` (2s) and the next cycle starts by itself, until `targetFor(ex)` cycles are done — then `auto` switches itself off. Turning the switch off clears `nextStart` but lets the running cycle finish; איפוס also clears it. The switch is hidden for exercises without timers.
+- **Done** is disabled until `DONE_AT` (10) cycles are *finished* — `it.count >= 10` and nothing running or resting, so the 10th hold must complete. A done mark can always be undone. Marking done on the detail screen returns to the list after 450ms.
 - **Routing** is by URL hash (`#open-wide`); `check` exercises are not routable.
 - `ring` is an SVG element — toggle its `hidden` attribute, not the `.hidden` property.
 - Images inside fixed containers use `width: 100%; height: 100%; object-fit: cover` (never `auto` + `max-*`).
