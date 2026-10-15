@@ -501,6 +501,13 @@ a.card:active { transform: scale(0.985); }
 
 .counter-btn.is-running:active { transform: none; }
 
+.counter-btn.is-complete {
+  background: radial-gradient(circle at 32% 24%, var(--green-2), var(--green) 72%);
+  filter: grayscale(0.25) brightness(0.92);
+}
+
+.counter-btn.is-complete:active { transform: none; }
+
 .counter-label {
   font-size: 14px;
   font-weight: 600;

@@ -72,7 +72,7 @@ const EXERCISES = [
   },
 ];
 
-const APP_VERSION = 'V2.2'; // shown on the welcome screen; bump with each release
+const APP_VERSION = 'V2.3'; // shown on the welcome screen; bump with each release
 const DONE_AT = 10; // Done unlocks once this many cycles are finished
 const AUTO_REST_MS = 1000; // pause between cycles when automatic counting is on
 const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
@@ -372,8 +372,10 @@ function renderExercise() {
   const paused = Boolean(phases.length && it.paused);
   const pausedInHold = paused && !Number.isFinite(it.pausedRest); // paused mid-hold, not mid-rest
 
+  const complete = it.count >= targetFor(ex); // all cycles done, no more taps
   counterValue.textContent = it.count;
   counterBtn.classList.toggle('is-running', running || resting || paused);
+  counterBtn.classList.toggle('is-complete', complete && !running && !resting && !paused);
   $('auto-toggle').checked = Boolean(it.auto);
 
   const pauseBtn = $('pause-btn');
@@ -407,7 +409,7 @@ function renderExercise() {
       card.classList.toggle('is-waiting', held && elapsed < p.start);
       if (active) status = p.label ? `מחזיקים – ${p.label}` : 'מחזיקים…';
     });
-    if (finished) status = 'הזמן הסתיים';
+    if (finished) status = complete ? `סיימתם ${targetFor(ex)} סיבובים` : 'הזמן הסתיים';
     if (resting) {
       status = `הסיבוב הבא בעוד ${Math.max(1, Math.ceil((it.nextStart - Date.now()) / 1000))}`;
     }
@@ -447,6 +449,8 @@ function increment() {
   unlockAudio();
   const it = item(current.id);
   const hasTimer = holdPhases(current).length > 0;
+
+  if (it.count >= targetFor(current)) return; // the set is complete
 
   if (hasTimer) {
     if (it.holdStart || it.nextStart || it.paused) return; // a cycle is already under way
@@ -692,6 +696,39 @@ function playTick(ctx, at) {
   return osc;
 }
 
+// The end of the whole set: a rising three-note chime, clearly not the bell.
+function playFinish(ctx, at) {
+  const master = ctx.createGain();
+  master.gain.value = 0.55;
+  master.connect(ctx.destination);
+  const nodes = [];
+  const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+  notes.forEach((freq, i) => {
+    const t = at + i * 0.17;
+    const decay = i === notes.length - 1 ? 2.4 : 0.8;
+    [1, 2].forEach((ratio, harmonic) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = harmonic === 0 ? 'triangle' : 'sine';
+      osc.frequency.value = freq * ratio;
+      const amp = harmonic === 0 ? 0.6 : 0.16;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(amp, t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      osc.connect(gain).connect(master);
+      osc.start(t);
+      osc.stop(t + decay + 0.05);
+      nodes.push(osc);
+    });
+  });
+  return nodes;
+}
+
+// The last phase of the last cycle finishes the set, so it chimes instead.
+function isFinalPhase(ex, it, phaseIndex) {
+  return phaseIndex === holdPhases(ex).length - 1 && it.count >= targetFor(ex);
+}
+
 // Queue a bell for the end of every phase of this hold that hasn't rung yet,
 // plus a tick for every remaining whole second (the last second is the bell).
 // Re-queuing replaces the exercise's earlier bells and ticks.
@@ -708,7 +745,9 @@ function scheduleBells(ex, it) {
     }
     if (i < (it.bellsDone || 0)) return;
     const fireAt = ctx.currentTime + Math.max(p.end - elapsed, 0);
-    scheduledBells[`${ex.id}:${i}`] = { fireAt, nodes: ringBell(ctx, fireAt) };
+    const finishing = isFinalPhase(ex, it, i);
+    const nodes = finishing ? playFinish(ctx, fireAt) : ringBell(ctx, fireAt);
+    scheduledBells[`${ex.id}:${i}`] = { fireAt, nodes };
   });
   scheduledTicks[ex.id] = ticks;
 }
@@ -747,7 +786,11 @@ function bellDue(id, phase) {
   }
   stopBell(id, phase);
   const ctx = ensureAudio();
-  if (ctx) ringBell(ctx, ctx.currentTime + 0.02);
+  if (!ctx) return;
+  const ex = EXERCISES.find((e) => e.id === id);
+  const it = state.items[id];
+  const finishing = ex && it && isFinalPhase(ex, it, phase);
+  (finishing ? playFinish : ringBell)(ctx, ctx.currentTime + 0.02);
 }
 
 // ===== WAKE LOCK =====
